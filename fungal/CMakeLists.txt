@@ -143,6 +143,11 @@ target_link_libraries(real_oracle_validator fungal_lib)
 add_executable(fungal_loop_external_demo src/core/control_loop_external_demo.cpp)
 target_link_libraries(fungal_loop_external_demo fungal_lib)
 
+# No GTest dependency (matches test_self_aware below) so this always builds.
+add_executable(test_pattern_accuracy_feedback tests/unit/test_pattern_accuracy_feedback.cpp)
+target_link_libraries(test_pattern_accuracy_feedback fungal_lib)
+add_test(NAME test_pattern_accuracy_feedback COMMAND test_pattern_accuracy_feedback LABELS "unit")
+
 if(GTest_FOUND OR GTEST_FOUND)
     if(GTEST_FOUND)
         include_directories(${GTEST_INCLUDE_DIRS})

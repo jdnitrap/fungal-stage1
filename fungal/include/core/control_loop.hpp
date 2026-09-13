@@ -81,6 +81,7 @@ private:
     double sense_and_predict(int task_type_id);
     StrategyResult generate_and_evaluate(const std::string& code_snippet);
     void commit_and_act(bool prediction_correct, bool oracle_truth, int energy_cost, int task_type_id, double predicted_prob);
+    void update_pattern_accuracy(const StrategyResult& strategy_result, bool claim_matches_truth);
 };
 
 }  // namespace fungal::core

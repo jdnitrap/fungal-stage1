@@ -250,6 +250,7 @@ CycleResult ControlLoop::run_cycle(const std::string& code_snippet) {
     const int energy_before_refund = energy_budget_.current_budget();
     commit_and_act(claim_matches_truth, oracle_truth, energy_cost,
                    task_type_id, predicted_success);
+    update_pattern_accuracy(strategy_result, claim_matches_truth);
 
     if (stage1_enabled_ && !stage1_safe_mode_) {
         AuditEvent post{};
@@ -290,13 +291,26 @@ double ControlLoop::sense_and_predict(int task_type_id) {
 }
 
 StrategyResult ControlLoop::generate_and_evaluate(const std::string& code_snippet) {
-    return strategy_->apply(code_snippet);
+    return strategy_->apply(code_snippet, self_model_);
 }
 
 void ControlLoop::commit_and_act(bool prediction_correct, bool /*oracle_truth*/,
                                   int energy_cost, int task_type_id, double predicted_prob) {
     energy_budget_.refund_outcome(prediction_correct, energy_cost);
     self_model_.update_from_outcome(task_type_id, prediction_correct, predicted_prob);
+}
+
+void ControlLoop::update_pattern_accuracy(const StrategyResult& strategy_result,
+                                           bool claim_matches_truth) {
+    // Closes the loop Strategy::apply() reads from: each pattern type that
+    // fired this cycle gets its own SelfModel accuracy record updated with
+    // whether the overall claim it contributed to turned out correct. The
+    // next time that pattern type fires, PatternMatcherStrategy::apply()
+    // (via compute_confidence) will read this updated accuracy back out.
+    for (int pattern_id : strategy_result.triggered_patterns) {
+        self_model_.update_from_outcome(pattern_id, claim_matches_truth,
+                                         strategy_result.strategy_confidence);
+    }
 }
 
 void ControlLoop::initialize_from_hardware() {

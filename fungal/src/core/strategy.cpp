@@ -6,32 +6,34 @@ namespace fungal::core {
 
 PatternMatcherStrategy::PatternMatcherStrategy() = default;
 
-StrategyResult PatternMatcherStrategy::apply(const std::string& code_snippet) {
+StrategyResult PatternMatcherStrategy::apply(const std::string& code_snippet, const SelfModel& self_model) {
     int energy_cost = 10;
-    int pattern_count = 0;
+    std::vector<int> triggered_patterns;
 
     if (has_null_dereference_pattern(code_snippet)) {
-        pattern_count++;
+        triggered_patterns.push_back(kNullDerefTaskId);
     }
     if (has_uninitialized_var_pattern(code_snippet)) {
-        pattern_count++;
+        triggered_patterns.push_back(kUninitializedVarTaskId);
     }
     if (has_off_by_one_pattern(code_snippet)) {
-        pattern_count++;
+        triggered_patterns.push_back(kOffByOneTaskId);
     }
 
-    bool claim = pattern_count > 0;
-    double confidence = compute_confidence(pattern_count, static_cast<int>(code_snippet.length()));
+    bool claim = !triggered_patterns.empty();
+    double confidence = compute_confidence(triggered_patterns, self_model,
+                                            static_cast<int>(code_snippet.length()));
 
     std::string reasoning = claim ?
-        "Found " + std::to_string(pattern_count) + " bug pattern(s) in code" :
+        "Found " + std::to_string(triggered_patterns.size()) + " bug pattern(s) in code" :
         "No obvious bug patterns detected";
 
     return StrategyResult{
         .claim = claim,
         .strategy_confidence = confidence,
         .reasoning = reasoning,
-        .energy_cost = energy_cost
+        .energy_cost = energy_cost,
+        .triggered_patterns = triggered_patterns
     };
 }
 
@@ -110,12 +112,26 @@ bool PatternMatcherStrategy::has_off_by_one_pattern(const std::string& code) {
     return has_for && has_inclusive && has_index;
 }
 
-double PatternMatcherStrategy::compute_confidence(int pattern_count, int code_length) {
-    if (pattern_count == 0) {
+double PatternMatcherStrategy::compute_confidence(const std::vector<int>& triggered_patterns,
+                                                   const SelfModel& self_model,
+                                                   int code_length) {
+    if (triggered_patterns.empty()) {
         return 0.2;
     }
 
-    double base_confidence = std::min(0.9, 0.3 + (pattern_count * 0.25));
+    // Each firing pattern contributes up to 0.25, scaled by that pattern
+    // type's own confirmed accuracy so far (SelfModel::get_accuracy, which
+    // defaults to a neutral 0.5 for a pattern type with no track record
+    // yet). A pattern that has historically been reliable pulls confidence
+    // up more than one that's been unreliable — this is what makes
+    // Strategy's output actually depend on SelfModel's accumulated
+    // per-pattern-type record instead of being fixed regardless of history.
+    double weighted_contribution = 0.0;
+    for (int pattern_id : triggered_patterns) {
+        weighted_contribution += 0.25 * self_model.get_accuracy(pattern_id);
+    }
+
+    double base_confidence = std::min(0.9, 0.3 + weighted_contribution);
     double length_factor = 1.0 / (1.0 + (code_length / 100.0));
     double confidence = base_confidence * (0.7 + 0.3 * length_factor);
     return std::min(0.95, std::max(0.05, confidence));

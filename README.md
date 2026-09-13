@@ -19,8 +19,11 @@ A C++17 control loop — `sense → predict → spend → strategy → oracle �
 
 - **Goal stack** (higher overrides lower): `survive` > `human_legible` > `seek_truth`
 - **EnergyBudget**: a real scarcity constraint gating whether the loop can act at all
-- **SelfModel**: tracks prediction accuracy/calibration over time
-- **Strategy**: a bug-prediction heuristic evaluated against snippets
+- **SelfModel**: tracks prediction accuracy/calibration over time, **and
+  now feeds back into Strategy** (see below — fixed 2026-09-13)
+- **Strategy**: a bug-prediction heuristic evaluated against snippets,
+  whose confidence output is weighted by each pattern type's own
+  confirmed accuracy in SelfModel
 - **Oracle**: ground-truth feedback used to refund/penalize the self-model
 - **Stage1Store**: atomic checkpoint (`state/checkpoint.json`) + append-only
   audit log (`state/audit.jsonl`), so a process can crash and resume with
@@ -52,10 +55,23 @@ are a "parallel track," not fused in yet.
 The intended arc, per `fungal/IMPLEMENTATION_SUMMARY.md`'s own "Next Steps"
 and prior analysis (see `EXPERIMENT_LOG.md`):
 
-1. Make `SelfModel`'s calibration output actually feed back into
-   `Strategy::apply()` — right now the loop tracks accuracy but never uses
-   it to change behavior. This is the single highest-leverage change to make
-   the "learning" claim real rather than passive logging.
+1. ~~Make `SelfModel`'s calibration output actually feed back into
+   `Strategy::apply()`~~ **Done 2026-09-13.** Each of the 3 real pattern
+   detectors (null-deref, uninitialized-var, off-by-one) now has its own
+   SelfModel-tracked accuracy (`kNullDerefTaskId`/`kUninitializedVarTaskId`/
+   `kOffByOneTaskId` in `strategy.hpp`), and `PatternMatcherStrategy::
+   compute_confidence()` weights each firing pattern's contribution by its
+   own confirmed accuracy instead of a flat per-pattern constant. After
+   every cycle, `ControlLoop::update_pattern_accuracy()` updates that
+   record for whichever patterns fired. Verified end-to-end, not just unit
+   in isolation: `tests/unit/test_pattern_accuracy_feedback.cpp` runs 16
+   real cycles through the actual `ControlLoop` and confirms
+   `strategy_confidence` for an identical snippet measurably rises as
+   SelfModel's accuracy for that pattern climbs from its 0.5 default.
+   **Honest scope note:** this makes the loop's existing 3 real detectors
+   adapt their confidence based on track record — it does NOT add
+   detection for the other 7 claimed bug categories, which still always
+   return "no bug" (that's item 3 below, a separate, larger effort).
 2. Hash-chain `audit.jsonl` (each entry links to a hash of the previous one)
    so the audit trail is genuinely tamper-evident, not just
    corruption-detecting. Real prior art: IETF draft
@@ -64,7 +80,7 @@ and prior analysis (see `EXPERIMENT_LOG.md`):
    analysis for at least a few more of the 10 claimed bug categories (only
    null-deref, uninitialized-var, and off-by-one have real heuristic
    detection today — the other 7 always return "no bug").
-4. Only after 1–3: consider fusing the self-improvement/alignment modules
+4. Only after 2-3: consider fusing the self-improvement/alignment modules
    into the live path, and only under the existing Stage1 non-goal
    constraints (no anti-kill, no self-copy, no hiding).
 
