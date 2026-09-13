@@ -1,0 +1,3 @@
+fungal/build/
+fungal_py/__pycache__/
+*.pyc

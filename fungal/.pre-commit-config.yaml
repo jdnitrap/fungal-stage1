@@ -1,0 +1,43 @@
+repos:
+  - repo: local
+    hooks:
+      - id: check-compile
+        name: Check Compilation
+        entry: bash scripts/check_compile.sh
+        language: script
+        pass_filenames: false
+        types: [c++]
+
+      - id: check-tests
+        name: Check Tests
+        entry: bash scripts/check_tests.sh
+        language: script
+        pass_filenames: false
+        stages: [commit]
+
+      - id: check-file-size
+        name: Check File Size
+        entry: bash scripts/check_file_size.sh
+        language: script
+        pass_filenames: false
+        types: [c++]
+
+      - id: check-interfaces
+        name: Check Critical Interfaces
+        entry: bash scripts/check_interfaces.sh
+        language: script
+        pass_filenames: false
+
+      - id: check-debug
+        name: Check Debug Code
+        entry: bash scripts/check_debug.sh
+        language: script
+        pass_filenames: false
+        types: [c++]
+
+      - id: clang-format
+        name: Format C++ Code
+        entry: clang-format -i
+        language: system
+        types: [c++]
+        pass_filenames: true

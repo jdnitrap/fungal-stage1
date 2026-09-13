@@ -1,0 +1,51 @@
+name: Build and Test
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ git
+
+      - name: Create build directory
+        run: mkdir -p build
+
+      - name: Configure CMake
+        working-directory: build
+        run: cmake ..
+
+      - name: Build
+        working-directory: build
+        run: make
+
+      - name: Run Unit Tests
+        working-directory: build
+        run: ctest -L unit --output-on-failure
+
+      - name: Run Integration Tests
+        working-directory: build
+        run: ctest -L integration --output-on-failure
+
+      - name: Run System Tests
+        working-directory: build
+        run: ctest -L system --output-on-failure
+
+      - name: Check File Sizes
+        run: bash scripts/check_file_size.sh
+
+      - name: Check Interfaces
+        run: bash scripts/check_interfaces.sh
+
+      - name: Check Debug Code
+        run: bash scripts/check_debug.sh

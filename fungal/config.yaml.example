@@ -1,0 +1,99 @@
+# Fungal Production System Configuration
+
+# API Server Configuration
+api:
+  port: 8080
+  host: 0.0.0.0
+  enable_cors: true
+  request_timeout_seconds: 30
+
+# Logging Configuration
+logging:
+  level: info
+  directory: logs
+  file_name: fungal.log
+  max_file_size_mb: 10
+  max_files: 3
+  console_output: true
+
+# Database Configuration
+database:
+  type: sqlite
+  file: fungal.db
+  # For PostgreSQL/MySQL:
+  # host: localhost
+  # port: 5432
+  # username: fungal
+  # password: changeme
+  # database: fungal
+  pool_size: 10
+
+# Threading Configuration
+threading:
+  num_threads: 4
+  task_queue_size: 1000
+
+# Security Configuration
+security:
+  auth_method: 1  # 0=none, 1=token, 2=basic, 3=certificate, 4=oauth2
+  enable_https: false
+  certificate_file: ""
+  private_key_file: ""
+  token_expiry_hours: 24
+  password_min_length: 8
+
+# Clustering Configuration
+clustering:
+  enabled: false
+  cluster_id: default
+  node_id: node1
+  heartbeat_interval_ms: 5000
+  election_timeout_ms: 15000
+  # peer_addresses:
+  #   - node2:9001
+  #   - node3:9001
+
+# Persistence Configuration
+persistence:
+  state_directory: state/
+  snapshot_directory: snapshots/
+  enable_auto_snapshot: true
+  snapshot_interval_minutes: 60
+
+# Backup Configuration
+backup:
+  enabled: true
+  directory: backups/
+  retention_days: 30
+  schedule:
+    enabled: true
+    hour: 2
+    minute: 0
+    type: incremental  # full or incremental
+
+# Health Check Configuration
+health:
+  check_interval_seconds: 30
+  memory_threshold_percent: 90
+  cpu_threshold_percent: 95
+  disk_threshold_percent: 85
+
+# Metrics Configuration
+metrics:
+  enabled: true
+  export_interval_seconds: 60
+  retention_hours: 24
+  prometheus_enabled: true
+  prometheus_port: 9090
+
+# Node Configuration
+node:
+  name: fungal-default
+  description: Default Fungal Production Node
+  version: 1.0.0
+
+# System Tuning
+tuning:
+  enable_performance_monitoring: true
+  enable_debug_logging: false
+  enable_profiling: false

@@ -1,0 +1,154 @@
+cmake_minimum_required(VERSION 3.16)
+project(FungalProduction)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+enable_testing()
+
+# ============================================================================
+# DEPENDENCIES
+# ============================================================================
+
+# Find or fetch required dependencies
+include(FetchContent)
+
+# spdlog for structured logging
+FetchContent_Declare(spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG v1.12.0
+)
+
+# nlohmann/json for JSON handling
+FetchContent_Declare(nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.2
+)
+
+# sqlite3 for database
+find_package(SQLite3)
+if(NOT SQLite3_FOUND)
+    message(STATUS "SQLite3 not found, will build from source")
+endif()
+
+# OpenSSL for security
+find_package(OpenSSL)
+
+FetchContent_MakeAvailable(spdlog nlohmann_json)
+
+# ============================================================================
+# CORE LIBRARY
+# ============================================================================
+
+set(FOUNDATION_SOURCES
+    src/hardware.cpp
+    src/substrate.cpp
+    src/introspection.cpp
+    src/autonomous_node.cpp
+    src/self_model.cpp
+)
+
+set(SAFETY_SOURCES
+    src/constraints.cpp
+    src/alignment.cpp
+    src/monitor.cpp
+)
+
+set(LEARNING_SOURCES
+    src/learning.cpp
+    src/self_improvement.cpp
+    src/neural_integration.cpp
+)
+
+set(PRODUCTION_SOURCES
+    src/production/config_manager.cpp
+    src/production/logger.cpp
+    src/production/persistence.cpp
+    src/production/api_server.cpp
+    src/production/metrics.cpp
+    src/production/health_check.cpp
+    src/production/thread_pool.cpp
+    src/production/security.cpp
+    src/production/database.cpp
+    src/production/cluster_manager.cpp
+    src/production/backup_manager.cpp
+)
+
+set(ALL_SOURCES
+    ${FOUNDATION_SOURCES}
+    ${SAFETY_SOURCES}
+    ${LEARNING_SOURCES}
+    ${PRODUCTION_SOURCES}
+    src/fungal_system.cpp
+)
+
+add_library(fungal_prod_lib ${ALL_SOURCES})
+target_include_directories(fungal_prod_lib PUBLIC include include/production)
+target_link_libraries(fungal_prod_lib PUBLIC spdlog::spdlog nlohmann_json::nlohmann_json)
+
+if(SQLite3_FOUND)
+    target_link_libraries(fungal_prod_lib PUBLIC SQLite::SQLite3)
+endif()
+
+if(OPENSSL_FOUND)
+    target_link_libraries(fungal_prod_lib PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
+# ============================================================================
+# PRODUCTION APPLICATIONS
+# ============================================================================
+
+# Production server
+add_executable(fungal_server src/production/main_server.cpp)
+target_link_libraries(fungal_server fungal_prod_lib)
+
+# Production CLI
+add_executable(fungal_cli src/production/main_cli.cpp)
+target_link_libraries(fungal_cli fungal_prod_lib)
+
+# Production dashboard backend
+add_executable(fungal_dashboard src/production/main_dashboard.cpp)
+target_link_libraries(fungal_dashboard fungal_prod_lib)
+
+# ============================================================================
+# TESTING
+# ============================================================================
+
+find_package(GTest QUIET)
+
+if(GTest_FOUND OR GTEST_FOUND)
+    if(GTEST_FOUND)
+        include_directories(${GTEST_INCLUDE_DIRS})
+    endif()
+
+    # Production tests
+    add_executable(test_production_config tests/production/test_config.cpp)
+    target_link_libraries(test_production_config fungal_prod_lib GTest::gtest_main)
+    add_test(NAME test_production_config COMMAND test_production_config LABELS "production")
+
+    add_executable(test_production_persistence tests/production/test_persistence.cpp)
+    target_link_libraries(test_production_persistence fungal_prod_lib GTest::gtest_main)
+    add_test(NAME test_production_persistence COMMAND test_production_persistence LABELS "production")
+
+    add_executable(test_production_api tests/production/test_api.cpp)
+    target_link_libraries(test_production_api fungal_prod_lib GTest::gtest_main)
+    add_test(NAME test_production_api COMMAND test_production_api LABELS "production")
+
+    message(STATUS "GTest found - building production tests")
+else()
+    message(WARNING "GTest not found - tests skipped")
+endif()
+
+# ============================================================================
+# INSTALLATION
+# ============================================================================
+
+install(TARGETS fungal_server fungal_cli fungal_dashboard
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+install(DIRECTORY include/production DESTINATION include)
+install(DIRECTORY config DESTINATION etc/fungal)
+install(DIRECTORY docker DESTINATION share/fungal)
